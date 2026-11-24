@@ -1,6 +1,27 @@
 package main
 
-import "testing"
+import (
+	"encoding/json"
+	"testing"
+)
+
+func TestBestVariant(t *testing.T) {
+	// fxtwitter shape: variants sit next to type/url, so xVariants must decode as an embedded field.
+	var m struct {
+		Type string `json:"type"`
+		xVariants
+	}
+	js := `{"type":"video","variants":[
+		{"url":"m3u8","bitrate":0,"content_type":"application/x-mpegURL"},
+		{"url":"hi","bitrate":2176000,"content_type":"video/mp4"},
+		{"url":"lo","bitrate":632000,"content_type":"video/mp4"}]}`
+	if err := json.Unmarshal([]byte(js), &m); err != nil {
+		t.Fatal(err)
+	}
+	if got := m.best(); got != "hi" {
+		t.Errorf("best() = %q, want hi", got)
+	}
+}
 
 func TestParse(t *testing.T) {
 	// expected tokens computed with node: ((id/1e15)*Math.PI).toString(36).replace(/(0+|\.)/g,"")

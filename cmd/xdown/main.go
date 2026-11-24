@@ -86,8 +86,11 @@ func run(link, dir string, photos bool) error {
 		}
 		fmt.Println(name)
 	}
+	if n == 0 && len(items) > 0 {
+		return fmt.Errorf("post has only photos (use -p to download them)")
+	}
 	if n == 0 {
-		return fmt.Errorf("no media found (use -p to include photos)")
+		return fmt.Errorf("post has no photos or videos")
 	}
 	return nil
 }
@@ -102,43 +105,99 @@ func getJSON(req *http.Request, v any) error {
 	if res.StatusCode != 200 {
 		return fmt.Errorf("%s: HTTP %d", req.URL.Host, res.StatusCode)
 	}
-	return json.NewDecoder(res.Body).Decode(v)
+	if err := json.NewDecoder(res.Body).Decode(v); err != nil {
+		return fmt.Errorf("%s: unexpected non-JSON response", req.URL.Host)
+	}
+	return nil
 }
 
-// --- X / Twitter: public syndication API (same one embedded tweets use) ---
+// --- X / Twitter ---
+
+type xVariants struct {
+	Variants []struct {
+		Bitrate     int    `json:"bitrate"`
+		ContentType string `json:"content_type"`
+		URL         string `json:"url"`
+	} `json:"variants"`
+}
+
+// best returns the highest-bitrate mp4 variant, or "" if there is none.
+func (x xVariants) best() string {
+	best, br := "", -1
+	for _, v := range x.Variants {
+		if v.ContentType == "video/mp4" && v.Bitrate > br {
+			best, br = v.URL, v.Bitrate
+		}
+	}
+	return best
+}
 
 func fetchX(id string) ([]media, error) {
+	if out, err := fetchXSyndication(id); err == nil {
+		return out, nil
+	}
+	// Syndication refuses sensitive/age-restricted posts (and breaks occasionally); fxtwitter serves them.
+	out, err := fetchXFx(id)
+	if err != nil {
+		return nil, fmt.Errorf("x: post unavailable (deleted, protected, or age-restricted): %w", err)
+	}
+	return out, nil
+}
+
+// fetchXSyndication uses the public API embedded tweets use.
+func fetchXSyndication(id string) ([]media, error) {
 	var t struct {
+		Typename     string `json:"__typename"`
 		MediaDetails []struct {
-			Type      string `json:"type"`
-			URL       string `json:"media_url_https"`
-			VideoInfo struct {
-				Variants []struct {
-					Bitrate     int    `json:"bitrate"`
-					ContentType string `json:"content_type"`
-					URL         string `json:"url"`
-				} `json:"variants"`
-			} `json:"video_info"`
+			Type      string    `json:"type"`
+			URL       string    `json:"media_url_https"`
+			VideoInfo xVariants `json:"video_info"`
 		} `json:"mediaDetails"`
 	}
 	req, _ := http.NewRequest("GET", "https://cdn.syndication.twimg.com/tweet-result?id="+id+"&token="+xToken(id), nil)
 	if err := getJSON(req, &t); err != nil {
 		return nil, err
 	}
+	if t.Typename == "TweetTombstone" {
+		return nil, fmt.Errorf("syndication: tombstone")
+	}
 	var out []media
 	for _, m := range t.MediaDetails {
 		if m.Type == "photo" {
 			out = append(out, media{m.URL + "?name=orig", true})
-			continue
+		} else if u := m.VideoInfo.best(); u != "" {
+			out = append(out, media{u, false})
 		}
-		best, br := "", -1
-		for _, v := range m.VideoInfo.Variants {
-			if v.ContentType == "video/mp4" && v.Bitrate > br {
-				best, br = v.URL, v.Bitrate
-			}
-		}
-		if best != "" {
-			out = append(out, media{best, false})
+	}
+	return out, nil
+}
+
+// fetchXFx uses the public fxtwitter API (github.com/FxEmbed/FxEmbed).
+func fetchXFx(id string) ([]media, error) {
+	var r struct {
+		Tweet *struct {
+			Media struct {
+				All []struct {
+					Type string `json:"type"`
+					URL  string `json:"url"`
+					xVariants
+				} `json:"all"`
+			} `json:"media"`
+		} `json:"tweet"`
+	}
+	req, _ := http.NewRequest("GET", "https://api.fxtwitter.com/status/"+id, nil)
+	if err := getJSON(req, &r); err != nil {
+		return nil, err
+	}
+	if r.Tweet == nil {
+		return nil, fmt.Errorf("fxtwitter: no tweet in response")
+	}
+	var out []media
+	for _, m := range r.Tweet.Media.All {
+		if m.Type == "photo" {
+			out = append(out, media{m.URL, true})
+		} else if u := m.best(); u != "" {
+			out = append(out, media{u, false})
 		}
 	}
 	return out, nil
