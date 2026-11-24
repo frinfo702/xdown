@@ -27,7 +27,6 @@ xdown -p 'https://x.com/user/status/1234567890?s=20'
 
 Files are saved as `x_<id>_<n>.<ext>` or `ig_<shortcode>_<n>.<ext>`.
 
-> **Note:** Quote URLs that contain `?` or `&`, otherwise your shell will interpret them.
 
 ## Supported URLs
 
@@ -36,5 +35,5 @@ Files are saved as `x_<id>_<n>.<ext>` or `ig_<shortcode>_<n>.<ext>`.
 
 ## Limitations
 
-- Only public posts are supported (no login).
+- Only public posts are supported.
 - Instagram may rate-limit anonymous requests.
