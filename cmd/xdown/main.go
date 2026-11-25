@@ -1,4 +1,4 @@
-// xdown downloads videos (and optionally photos) from X/Twitter and Instagram posts.
+// xdown downloads videos (and optionally photos) from X/Twitter, Instagram, and YouTube.
 //
 //	xdown [-d dir] [-p] <url>
 package main
@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -24,6 +25,7 @@ const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 var (
 	xRe  = regexp.MustCompile(`(?:twitter|x)\.com/[^/]+/status(?:es)?/(\d+)`)
 	igRe = regexp.MustCompile(`instagram\.com/(?:[^/]+/)?(?:p|reels?|tv)/([A-Za-z0-9_-]+)`)
+	ytRe = regexp.MustCompile(`(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|live/|embed/)|youtu\.be/)([A-Za-z0-9_-]{11})`)
 )
 
 type media struct {
@@ -58,6 +60,9 @@ func run(link, dir string, photos bool) error {
 		items  []media
 		err    error
 	)
+	if m := ytRe.FindStringSubmatch(link); m != nil {
+		return fetchYT(m[1], dir)
+	}
 	if m := xRe.FindStringSubmatch(link); m != nil {
 		prefix = "x_" + m[1]
 		items, err = fetchX(m[1])
@@ -303,6 +308,22 @@ func fetchIG(code string) ([]media, error) {
 		}
 	}
 	return out, nil
+}
+
+// --- YouTube: delegated to yt-dlp, which keeps up with YouTube's signature/PO-token changes ---
+
+func fetchYT(id, dir string) error {
+	if _, err := exec.LookPath("yt-dlp"); err != nil {
+		return fmt.Errorf("youtube: yt-dlp not found in PATH (install it, e.g. brew install yt-dlp)")
+	}
+	cmd := exec.Command("yt-dlp", "--no-playlist", "--no-simulate", "--print", "after_move:filepath",
+		"-S", "vcodec:h264,ext", "--merge-output-format", "mp4", // h264/aac mp4 like X/IG; ponytail: caps at 1080p, drop vcodec:h264 for 4K AV1/VP9
+		"-o", filepath.Join(dir, "yt_"+id+".%(ext)s"), "--", id)
+	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("youtube: yt-dlp failed: %w", err)
+	}
+	return nil
 }
 
 func download(src, dst string) error {

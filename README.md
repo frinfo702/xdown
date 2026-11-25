@@ -1,6 +1,6 @@
 # xdown
 
-Download videos (and optionally photos) from X/Twitter and Instagram posts.
+Download videos (and optionally photos) from X/Twitter and Instagram posts, and videos from YouTube.
 
 ## Install
 
@@ -23,15 +23,17 @@ xdown [-d dir] [-p] <url>
 xdown https://x.com/user/status/1234567890
 xdown -d ~/Downloads https://www.instagram.com/reel/ABC123/
 xdown -p 'https://x.com/user/status/1234567890?s=20'
+xdown https://youtu.be/dQw4w9WgXcQ
 ```
 
-Files are saved as `x_<id>_<n>.<ext>` or `ig_<shortcode>_<n>.<ext>`.
+Files are saved as `x_<id>_<n>.<ext>` or `ig_<shortcode>_<n>.<ext>`, or `yt_<id>.<ext>`.
 
 
 ## Supported URLs
 
 - X/Twitter: `x.com/<user>/status/<id>`, `twitter.com/<user>/status/<id>`
 - Instagram: `instagram.com/p/<code>`, `/reel/<code>`, `/tv/<code>`
+- YouTube: `youtube.com/watch?v=<id>`, `/shorts/<id>`, `/live/<id>`, `youtu.be/<id>` (requires [yt-dlp](https://github.com/yt-dlp/yt-dlp) in `PATH`; ffmpeg recommended for best quality)
 
 ## Limitations
 

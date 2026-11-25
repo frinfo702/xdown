@@ -52,4 +52,15 @@ func TestParse(t *testing.T) {
 			t.Errorf("igRe(%s) = %v", u, m)
 		}
 	}
+	for u, want := range map[string]string{
+		"https://www.youtube.com/watch?v=jNQXAC9IVRw":           "jNQXAC9IVRw",
+		"https://youtube.com/watch?feature=share&v=jNQXAC9IVRw": "jNQXAC9IVRw",
+		"https://youtu.be/jNQXAC9IVRw?si=abc":                   "jNQXAC9IVRw",
+		"https://www.youtube.com/shorts/abc_DEF-123":            "abc_DEF-123",
+		"https://m.youtube.com/live/abc_DEF-123?feature=shared": "abc_DEF-123",
+	} {
+		if m := ytRe.FindStringSubmatch(u); m == nil || m[1] != want {
+			t.Errorf("ytRe(%s) = %v", u, m)
+		}
+	}
 }
