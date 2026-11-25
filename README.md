@@ -5,7 +5,15 @@ Download videos (and optionally photos) from X/Twitter and Instagram posts, and 
 ## Install
 
 ```sh
-go install github.com/frinfo702/xdown/cmd/xdown@latest
+GOPROXY=direct go install github.com/frinfo702/xdown/cmd/xdown@main
+```
+
+`GOPROXY=direct` skips the Go module proxy, which can serve a stale `@latest` for a while after a push.
+
+YouTube downloads also need [yt-dlp](https://github.com/yt-dlp/yt-dlp) and ffmpeg in `PATH`:
+
+```sh
+brew install yt-dlp ffmpeg
 ```
 
 ## Usage
